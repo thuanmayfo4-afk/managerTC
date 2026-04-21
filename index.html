@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QA Manager</title>
+
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+<div class="layout">
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="logo">QA<span>/</span>manager</div>
+      <button class="toggle-btn" onclick="toggleSidebar()" title="Toggle sidebar">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8">
+          <rect x="1" y="1" width="12" height="12" rx="2"/><line x1="5" y1="1" x2="5" y2="13"/>
+        </svg>
+      </button>
+    </div>
+    <div class="sidebar-section">Modules</div>
+    <div class="module-list" id="moduleList"></div>
+    <button class="btn-add-module" onclick="openAddModuleModal()">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><line x1="6" y1="1" x2="6" y2="11"/><line x1="1" y1="6" x2="11" y2="6"/></svg>
+      <span>Add Module</span>
+    </button>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="main">
+    <div class="topbar" id="topbar">
+      <div id="topbarContent">
+        <span style="color:var(--text3);font-size:13px">Select a module from the sidebar</span>
+      </div>
+    </div>
+
+    <div class="toolbar" id="toolbar" style="display:none">
+      <div class="search-wrap">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="7" cy="7" r="5"/><line x1="11" y1="11" x2="14" y2="14"/></svg>
+        <input class="search-input" id="searchInput" placeholder="Search test cases..." oninput="renderContent()">
+      </div>
+      <select class="filter-select" id="statusFilter" onchange="renderContent()">
+        <option value="">All Status</option>
+        <option value="Not Run">Not Run</option>
+        <option value="Pass">Pass</option>
+        <option value="Fail">Fail</option>
+        <option value="Blocked">Blocked</option>
+      </select>
+      <select class="filter-select" id="groupFilter" onchange="renderContent()">
+        <option value="">All Groups</option>
+      </select>
+
+      <div class="toolbar-right">
+        <button class="btn-sm" onclick="openAddGroupModal()">Add Group</button>
+        <button class="btn-sm primary" onclick="openAddTCModal()">Add Test Case</button>
+        <button class="btn-sm" onclick="exportHTML()">Export</button>
+        <button class="btn-sm" onclick="document.getElementById('fileInput').click()">Import CSV</button>
+        <input type="file" id="fileInput" accept=".csv" style="display:none" onchange="handleImport()" />
+      </div>
+    </div>
+
+    <div class="content" id="content"></div>
+  </div>
+</div>
+
+<!-- MODALS -->
+<div class="modal-overlay" id="addModuleModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="addModuleModalTitle">Add New Module</div>
+      <button class="modal-close" onclick="closeModal('addModuleModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label" for="m-name">Module Name</label>
+        <input id="m-name" class="form-input" type="text" placeholder="Enter module name" autocomplete="off">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="m-icon">Icon</label>
+        <input id="m-icon" class="form-input" type="text" placeholder="Emoji or icon (optional)" autocomplete="off">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="m-desc">Description</label>
+        <textarea id="m-desc" class="form-textarea" rows="4" placeholder="Short description"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeModal('addModuleModal')">Cancel</button>
+      <button class="btn-save" id="saveModuleBtn" onclick="saveModule()">Create Module</button>
+    </div>
+  </div>
+</div>
+<div class="modal-overlay" id="addGroupModal">
+  <div class="modal" style="width:420px">
+    <div class="modal-header">
+      <div class="modal-title" id="addGroupModalTitle">Add Group</div>
+      <button class="modal-close" onclick="closeModal('addGroupModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label" for="group-name">Group Name</label>
+        <input id="group-name" class="form-input" type="text" placeholder="Group 1 — New Feature" autocomplete="off">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeModal('addGroupModal')">Cancel</button>
+      <button class="btn-save" id="groupSaveBtn" onclick="saveGroup()">Add Group</button>
+    </div>
+  </div>
+</div>
+<div class="modal-overlay" id="confirmModal">
+  <div class="modal" style="width:420px">
+    <div class="modal-header">
+      <div class="modal-title" id="confirmModalTitle">Confirm</div>
+      <button class="modal-close" onclick="closeModal('confirmModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div id="confirmModalMessage" style="color:var(--text2);line-height:1.6"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeModal('confirmModal')">Cancel</button>
+      <button class="btn-save danger" id="confirmModalBtn" onclick="confirmModalAction()">Delete</button>
+    </div>
+  </div>
+</div>
+<div class="modal-overlay" id="tcModal">
+  <div class="modal" style="width:640px">
+    <div class="modal-header">
+      <div class="modal-title" id="tcModalTitle">Add Test Case</div>
+      <button class="modal-close" onclick="closeModal('tcModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Test Case ID *</label>
+          <input class="form-input" id="tc-id" placeholder="TC-001" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Status</label>
+          <select class="form-select" id="tc-status">
+            <option value="Not Run">Not Run</option>
+            <option value="Pass">Pass</option>
+            <option value="Fail">Fail</option>
+            <option value="Blocked">Blocked</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Group *</label>
+        <select class="form-select" id="tc-group"></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Test Case Name *</label>
+        <input class="form-input" id="tc-name" placeholder="Short descriptive name" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Description / Objective + Precondition</label>
+        <textarea class="form-textarea" id="tc-desc" placeholder="Objective: ...&#10;Precondition: ..."></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Test Data</label>
+        <textarea class="form-textarea" id="tc-data" placeholder="Input data, accounts, configs..." style="min-height:56px"></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Steps</label>
+        <textarea class="form-textarea" id="tc-steps" placeholder="1. Step one&#10;2. Step two"></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Expected Result</label>
+        <textarea class="form-textarea" id="tc-expected" placeholder="What should happen"></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Actual Result</label>
+        <textarea class="form-textarea" id="tc-actual" placeholder="Fill after execution" style="min-height:56px"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeModal('tcModal')">Cancel</button>
+      <button class="btn-save" id="tcSaveBtn" onclick="saveTC()">Add Test Case</button>
+    </div>
+  </div>
+</div>
+
+<div id="ctxMenu" style="display:none"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+<script src="app.js"></script>
+</body>
+</html>
