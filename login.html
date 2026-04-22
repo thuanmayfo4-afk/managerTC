@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Login</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="login-screen">
+    <div class="login-card">
+      <div>
+        <div class="login-brand">QA Manager</div>
+        <p class="login-subtitle">Sign in to manage your QA test cases with a modern, clean workspace.</p>
+      </div>
+      <form id="loginForm" class="login-form">
+        <input type="email" id="email" placeholder="Email" required autocomplete="username" />
+        <input type="password" id="password" placeholder="Password" required autocomplete="current-password" />
+        <button type="submit" class="btn-save primary">Sign In</button>
+      </form>
+      <div class="login-footer">Enter your Supabase account credentials to continue.</div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <script src="supabaseClient.js"></script>
+  <script src="login.js"></script>
+</body>
+</html>

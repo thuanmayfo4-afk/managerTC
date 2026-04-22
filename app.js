@@ -1,10 +1,31 @@
-if (!window._supabaseClient) {
-  window._supabaseClient = window.supabase.createClient(
+if (!window.supabaseClient) {
+  window.supabaseClient = window.supabase.createClient(
     "https://mafrpncpedhtgcdauprc.supabase.co",
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1hZnJwbmNwZWRodGdjZGF1cHJjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3ODg1OTYsImV4cCI6MjA5MjM2NDU5Nn0.ci8mbjQMStzKFUdKMqou9o-UqeG00mddDnY9lmUVbec"
   );
 }
-const supabaseClient = window._supabaseClient;
+const supabaseClient = window.supabaseClient;
+
+
+async function checkAuth() {
+  const { data } = await supabaseClient.auth.getSession();
+  if (!data.session) {
+    window.location.href = "/login.html";
+  }
+}
+
+checkAuth();
+
+
+async function logout() {
+  try {
+    await supabaseClient.auth.signOut();
+  } catch (e) {
+    console.error(e);
+  }
+  window.location.href = "login.html";
+}
+
 
 // ── VARS ──
 

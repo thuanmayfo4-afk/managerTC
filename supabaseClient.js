@@ -1,0 +1,4 @@
+window.supabaseClient = window.supabase.createClient(
+  "https://mafrpncpedhtgcdauprc.supabase.co",
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1hZnJwbmNwZWRodGdjZGF1cHJjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3ODg1OTYsImV4cCI6MjA5MjM2NDU5Nn0.ci8mbjQMStzKFUdKMqou9o-UqeG00mddDnY9lmUVbec"
+);
