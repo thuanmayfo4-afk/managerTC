@@ -228,7 +228,7 @@ function renderContent() {
 function renderRow(gid, c) {
   const stClass = {'Not Run':'st-notrun','Pass':'st-pass','Fail':'st-fail','Blocked':'st-blocked'}[c.status] || 'st-notrun';
   const fmtDesc = c.desc.replace(/^Objective:(.*?)(\n|$)/m, '<div class="cell-label">Objective</div><div>$1</div>').replace(/Precondition:(.*?)(\n|$)/m, '<div class="cell-label" style="margin-top:4px">Precondition</div><div>$1</div>');
-  const fmtSteps = c.steps.split(/\n|\|/).filter(Boolean).map(s => `<li>${s.replace(/^\d+\.\s*/,'').trim()}</li>`).join('');
+  const fmtSteps = c.steps.split(/\n|\|/).filter(Boolean).map((s,i) => `<li>${s.replace(/^\d+[\.\)]\s*/,'').trim()}</li>`).join('');
   const fmtExp = c.expected.split(/\n|\|/).filter(Boolean).map(s => `<li>${s.replace(/^[-•]\s*/,'').trim()}</li>`).join('');
   return `<tr id="row-${c.id}">
     <td class="col-id"><span class="cell-mono editable" contenteditable="true" spellcheck="false" onblur="updateCell('${gid}','${c.id}','id',this.innerText)">${c.id}</span></td>
