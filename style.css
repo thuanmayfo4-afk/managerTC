@@ -146,8 +146,26 @@ button,select,input,textarea{font:inherit}
 .group-title-text{font-family:var(--mono);font-size:13px;font-weight:700;color:var(--accent);flex:1;outline:none}
 .group-title-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .group-title-text:focus{color:var(--text)}
-.group-count{font-family:var(--mono);font-size:11px;background:var(--accent-dim);color:var(--accent);padding:4px 10px;border-radius:999px}
-.group-actions{display:flex;gap:6px;position:absolute;top:50%;right:20px;transform:translateY(-50%);opacity:1;visibility:visible;pointer-events:auto;transition:opacity .15s,visibility .15s}
+.group-count {
+  font-family: var(--mono);
+  font-size: 11px;
+  background: var(--accent-dim);
+  color: var(--accent);
+  padding: 4px 10px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.group-actions {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+  flex-shrink: 0;
+  opacity: 1;
+  transition: opacity .15s;
+}
+
+
 .group-action-btn{background:var(--bg3);border:none;color:var(--text3);cursor:pointer;padding:8px 10px;border-radius:12px;font-size:12px;transition:all .2s}
 .group-action-btn:hover{background:var(--accent-dim);color:var(--accent)}
 .group-body{border:1px solid var(--border);border-top:none;border-radius:0 0 22px 22px;overflow:hidden;background:var(--bg2);box-shadow:0 12px 24px rgba(15,23,42,0.04)}
