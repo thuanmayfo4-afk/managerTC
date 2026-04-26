@@ -66,6 +66,7 @@
       <div class="toolbar-right">
         <button class="btn-sm" onclick="openAddGroupModal()">Add Group</button>
         <button class="btn-sm primary" onclick="openAddTCModal()">Add Test Case</button>
+        <button class="btn-sm" onclick="openAIModal()" style="background:var(--accent);border-color:var(--accent);color:#fff">✨ Generate</button>
         <button class="btn-sm" onclick="exportHTML()">Export</button>
         <button class="btn-sm" onclick="document.getElementById('fileInput').click()">Import CSV</button>
         <input type="file" id="fileInput" accept=".csv" style="display:none" onchange="handleImport()" />
@@ -194,10 +195,89 @@
   </div>
 </div>
 
+<!-- MODAL: AI Generate -->
+<div class="modal-overlay" id="aiModal">
+  <div class="modal" style="width:680px;max-height:90vh;display:flex;flex-direction:column">
+    <div class="modal-header">
+      <div class="modal-title" id="aiModalTitle">✨ Generate Test Cases with AI</div>
+      <button class="modal-close" onclick="closeAIModal()">×</button>
+    </div>
+
+    <!-- Step 1: Input -->
+    <div id="aiStep1" style="display:flex;flex-direction:column;flex:1;overflow:hidden">
+  <div class="modal-body" style="flex:1">
+    <div class="form-group">
+      <label class="form-label">Upload Requirement (PDF only)</label>
+
+      <!-- ✅ FILE INPUT -->
+      <div class="form-group">
+  <label class="form-label">Upload Requirement (PDF)</label>
+
+  <div class="file-upload">
+    <label for="ai-requirement" class="file-label">
+      📄 Select PDF file
+    </label>
+
+    <input 
+      type="file" 
+      id="ai-requirement" 
+      accept="application/pdf"
+    />
+
+    <span id="fileName">File not selected</span>
+  </div>
+</div>
+
+      <!-- ✅ SHOW FILE NAME -->
+      <div id="ai-file-name" style="font-size:12px;color:var(--text3);margin-top:6px"></div>
+    </div>
+
+    <div style="font-size:11.5px;color:var(--text3);margin-top:4px">
+      📄 Upload a PDF file containing your requirement. AI will generate test cases automatically.
+    </div>
+  </div>
+
+  <div class="modal-footer">
+    <button class="btn-cancel" onclick="closeAIModal()">Cancel</button>
+    <button class="btn-save" id="aiGenerateBtn" onclick="handleGenerate()">
+      ✨ Generate
+    </button>
+  </div>
+</div>
+
+    <!-- Step 2: Preview -->
+    <div id="aiStep2" style="display:none;flex-direction:column;flex:1;overflow:hidden">
+      <div style="padding:12px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+        <div style="font-size:12.5px;color:var(--text2)" id="aiPreviewCount"></div>
+        <div style="display:flex;gap:8px">
+          <button class="btn-sm" onclick="selectAllTC(true)">Select All</button>
+          <button class="btn-sm" onclick="selectAllTC(false)">Deselect All</button>
+        </div>
+      </div>
+      <div id="aiPreviewList" style="flex:1;overflow-y:auto;padding:16px 20px"></div>
+      <div class="modal-footer">
+        <button class="btn-cancel" onclick="backToStep1()">← Back</button>
+        <button class="btn-save" id="aiImportBtn" onclick="handleAIImport()">
+          Import Selected
+        </button>
+      </div>
+    </div>
+
+    <!-- Loading -->
+    <div id="aiLoading" style="display:none;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;gap:16px">
+      <div style="font-size:32px">✨</div>
+      <div style="font-size:14px;font-weight:500;color:var(--text)">Generating test cases...</div>
+      <div style="font-size:12.5px;color:var(--text3)">This may take a few seconds</div>
+    </div>
+  </div>
+</div>
+
 <div id="ctxMenu" style="display:none"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 <script src="js/supabaseClient.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="js/ai.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

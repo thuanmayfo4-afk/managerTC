@@ -1,4 +1,4 @@
 window.supabaseClient = window.supabase.createClient(
-  "https://mafrpncpedhtgcdauprc.supabase.co",
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1hZnJwbmNwZWRodGdjZGF1cHJjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3ODg1OTYsImV4cCI6MjA5MjM2NDU5Nn0.ci8mbjQMStzKFUdKMqou9o-UqeG00mddDnY9lmUVbec"
+  "https://atzcketgnawmqblovumr.supabase.co",
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF0emNrZXRnbmF3bXFibG92dW1yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3ODg3MDMsImV4cCI6MjA5MjM2NDcwM30.OP6HmdcFoJCSsbyZXYfgT4cuC7P3_r29gB3qUv1JoOk"
 );

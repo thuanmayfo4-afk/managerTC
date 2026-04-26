@@ -1247,3 +1247,45 @@ textarea {
 	background: var(--border);
 	margin: 4px 0
 }
+
+.file-upload {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+  transition: all 0.2s ease;
+}
+
+.file-upload:hover {
+  border-color: #4f8ef7;
+  background: #f1f6ff;
+}
+
+.file-upload input[type="file"] {
+  display: none;
+}
+
+.file-label {
+  background: linear-gradient(135deg, #4f8ef7, #3a7be0);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.file-label:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(79, 142, 247, 0.3);
+}
+
+#fileName {
+  font-size: 13px;
+  color: #475569;
+  font-style: italic;
+}
