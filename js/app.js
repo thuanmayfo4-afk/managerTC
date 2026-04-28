@@ -881,7 +881,7 @@ async function handleGenerate() {
     fileInput.value = '';
   } catch (err) {
     console.error(err);
-    toast('Failed to generate: ' + err.message, 'danger');
+    toast('Failed to generate test cases', 'danger');
     document.getElementById('aiLoading').style.display = 'none';
     document.getElementById('aiStep1').style.display = 'flex';
   }
@@ -958,7 +958,7 @@ async function handleAIImport() {
     toast(`Imported ${selected.length} test cases successfully! 🎉`);
   } catch (err) {
     console.error(err);
-    toast('Import failed: ' + err.message, 'danger');
+    toast('Import failed, please try again', 'danger');
   }
 
   document.getElementById('aiImportBtn').textContent = 'Import Selected';
