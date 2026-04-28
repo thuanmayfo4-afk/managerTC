@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Caio - Projects</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐶</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body class="projects-page">
+
+  <!-- HEADER -->
+  <header class="projects-header">
+    <div class="logo">QA<span> </span>Manager</div>
+    <div class="header-right">
+      <div class="user-chip">
+        <div class="user-avatar" id="userAvatar">?</div>
+        <span id="userEmail">Loading...</span>
+        <span class="role-badge" id="roleBadge"></span>
+      </div>
+      <button class="logout-btn" onclick="logout()" title="Logout">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+          <polyline points="16,17 21,12 16,7"/>
+          <line x1="21" y1="12" x2="9" y2="12"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- BODY -->
+  <main class="projects-body">
+    <div class="projects-hero">
+      <div class="projects-hero-text">
+        <div class="projects-hero-title">Projects</div>
+        <div class="projects-hero-sub">Select a project to manage test cases</div>
+      </div>
+      <!-- Only visible for super_admin -->
+      <button class="btn-create-project" id="btnCreateProject" onclick="openCreateProjectModal()" style="display:none">
+        <svg width="14" height="14" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.2">
+          <line x1="6" y1="1" x2="6" y2="11"/><line x1="1" y1="6" x2="11" y2="6"/>
+        </svg>
+        New Project
+      </button>
+    </div>
+
+    <!-- GRID -->
+    <div class="projects-grid" id="projectsGrid">
+      <!-- cards rendered by JS -->
+    </div>
+
+    <!-- EMPTY STATE -->
+    <div class="projects-empty" id="projectsEmpty" style="display:none">
+      <div class="empty-icon">📋</div>
+      <div class="empty-title">No projects yet</div>
+      <div class="empty-sub">Create your first project to get started</div>
+    </div>
+  </main>
+
+  <!-- SKELETON (loading) -->
+  <div id="projectsLoading" style="display:none">
+    <div class="projects-body">
+      <div class="projects-grid">
+        <div class="project-card-skeleton"></div>
+        <div class="project-card-skeleton"></div>
+        <div class="project-card-skeleton"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONTEXT MENU -->
+  <div id="projectCtxMenu" style="display:none">
+    <div class="ctx-item" onclick="handleCtxEdit()">✏️&nbsp; Edit Project</div>
+    <div class="ctx-sep"></div>
+    <div class="ctx-item danger" onclick="handleCtxDelete()">🗑️&nbsp; Delete Project</div>
+  </div>
+
+  <!-- MODAL: Create / Edit Project -->
+  <div class="modal-overlay" id="projectModal">
+    <div class="modal" style="width:520px">
+      <div class="modal-header">
+        <div class="modal-title" id="projectModalTitle">New Project</div>
+        <button class="modal-close" onclick="closeModal('projectModal')">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Project Name *</label>
+          <input class="form-input" id="p-name" placeholder="e.g. Mobile App v2.0" autocomplete="off"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Icon (emoji)</label>
+          <input class="form-input" id="p-icon" placeholder="📁" autocomplete="off" style="font-size:20px;max-width:100px"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Description</label>
+          <textarea class="form-textarea" id="p-desc" placeholder="Short description of this project..." rows="3"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-cancel" onclick="closeModal('projectModal')">Cancel</button>
+        <button class="btn-save" id="projectSaveBtn" onclick="saveProject()">Create Project</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: Confirm Delete -->
+  <div class="modal-overlay" id="confirmModal">
+    <div class="modal" style="width:420px">
+      <div class="modal-header">
+        <div class="modal-title" id="confirmModalTitle">Confirm Delete</div>
+        <button class="modal-close" onclick="closeModal('confirmModal')">×</button>
+      </div>
+      <div class="modal-body">
+        <div id="confirmModalMessage" style="color:var(--text2);line-height:1.6"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-cancel" onclick="closeModal('confirmModal')">Cancel</button>
+        <button class="btn-save danger" onclick="confirmAction()">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <script src="js/supabaseClient.js"></script>
+  <script src="js/projects.js"></script>
+</body>
+</html>

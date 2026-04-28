@@ -3,19 +3,19 @@ const supabaseClient = window.supabaseClient;
 // ── AUTH ──
 async function checkAuth() {
   const { data, error } = await supabaseClient.auth.getSession();
-if (error || !data.session) {
-  window.location.href = "/login.html";
+  if (error || !data.session) {
+    window.location.href = '/login.html';
   }
 }
 checkAuth();
 
 async function logout() {
-  try {
-    await supabaseClient.auth.signOut();
-  } catch (e) {
-    console.error(e);
-  }
-  window.location.href = "login.html";
+  try { await supabaseClient.auth.signOut(); } catch (e) { console.error(e); }
+  window.location.href = 'login.html';
+}
+
+function goBackToProjects() {
+  window.location.href = 'projects.html';
 }
 
 // ── VARS ──
@@ -25,20 +25,95 @@ let editingModuleId = null;
 let confirmCallback = null;
 let sidebarCollapsed = false;
 let modules = [];
+let currentProjectId = null;
+let currentProjectName = '';
+let isViewer = false;  // true = viewer, false = admin / super_admin
+
+// ── GET PROJECT ID FROM URL ──
+function getProjectIdFromURL() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get('project_id');
+}
+
+// ── CHECK ROLE FOR THIS PROJECT ──
+async function checkProjectRole() {
+  const { data: session } = await supabaseClient.auth.getSession();
+  if (!session?.session) return;
+  const userId = session.session.user.id;
+
+  // Check super_admin first
+  const { data: profile } = await supabaseClient
+    .from('user_profiles')
+    .select('role')
+    .eq('id', userId)
+    .single();
+
+  if (profile?.role === 'super_admin') {
+    isViewer = false;
+    return;
+  }
+
+  // Check project_members role
+  const { data: member } = await supabaseClient
+    .from('project_members')
+    .select('role')
+    .eq('project_id', currentProjectId)
+    .eq('user_id', userId)
+    .single();
+
+  // 'admin' → full access, 'viewer' → read only
+  isViewer = !member || member.role === 'viewer';
+}
+
+// ── APPLY VIEWER RESTRICTIONS ──
+function applyViewerRestrictions() {
+  if (!isViewer) return;
+
+  // Show viewer badge
+  const badge = document.getElementById('viewerBadge');
+  if (badge) badge.style.display = 'flex';
+
+  // Disable action buttons with tooltip
+  const restrictedBtns = ['btnAddGroup', 'btnAddTC', 'btnGenerate', 'btnImport', 'btnAddModule'];
+  restrictedBtns.forEach(id => {
+    const btn = document.getElementById(id);
+    if (!btn) return;
+    btn.disabled = true;
+    btn.title = 'You don\'t have permission to perform this action';
+    btn.classList.add('btn-disabled');
+  });
+}
 
 // ── DB ──
 async function loadFromDB() {
   const { data: mods, error: modErr } = await supabaseClient
-    .from('modules').select('*').order('created_at');
+    .from('modules')
+    .select('*')
+    .eq('project_id', currentProjectId)
+    .order('created_at');
   if (modErr) { console.error(modErr); modules = []; return; }
 
+  const modIds = (mods || []).map(m => m.id);
+  if (!modIds.length) { modules = []; return; }
+
   const { data: grps, error: grpErr } = await supabaseClient
-    .from('groups').select('*').order('position');
+    .from('groups')
+    .select('*')
+    .in('module_id', modIds)
+    .order('position');
   if (grpErr) { console.error(grpErr); modules = []; return; }
 
-  const { data: tcs, error: tcErr } = await supabaseClient
-    .from('test_cases').select('*').order('position');
-  if (tcErr) { console.error(tcErr); modules = []; return; }
+  const grpIds = (grps || []).map(g => g.id);
+  let tcs = [];
+  if (grpIds.length) {
+    const { data: tcData, error: tcErr } = await supabaseClient
+      .from('test_cases')
+      .select('*')
+      .in('group_id', grpIds)
+      .order('position');
+    if (tcErr) { console.error(tcErr); modules = []; return; }
+    tcs = tcData || [];
+  }
 
   modules = (mods || []).map(m => ({
     ...m,
@@ -47,14 +122,14 @@ async function loadFromDB() {
       .filter(g => g.module_id === m.id)
       .map(g => ({
         ...g,
-        cases: (tcs || [])
+        cases: tcs
           .filter(tc => tc.group_id === g.id)
           .map(tc => ({
-  ...tc,
-  dbId: tc.id,      
-  code: tc.code,
-  desc: tc.description
-}))
+            ...tc,
+            dbId: tc.id,
+            code: tc.code,
+            desc: tc.description
+          }))
       }))
   }));
 }
@@ -86,6 +161,8 @@ function renderSidebar() {
 }
 
 function showModuleCtx(e, id) {
+  // Viewer: no context menu
+  if (isViewer) return;
   e.preventDefault();
   showCtx(e.clientX, e.clientY, [
     { label: '✏️  Edit', action: `openEditModuleModal('${id}')` },
@@ -95,6 +172,7 @@ function showModuleCtx(e, id) {
 }
 
 async function deleteModule(id) {
+  if (isViewer) return;
   openConfirmModal('Delete Module', 'Delete this module and all its test cases?', async () => {
     const { error } = await supabaseClient.from('modules').delete().eq('id', id);
     if (error) { console.error(error); toast('Error deleting module', 'danger'); return; }
@@ -106,6 +184,7 @@ async function deleteModule(id) {
 }
 
 function openAddModuleModal() {
+  if (isViewer) return;
   editingModuleId = null;
   document.getElementById('addModuleModalTitle').textContent = 'Add New Module';
   document.getElementById('saveModuleBtn').textContent = 'Create Module';
@@ -116,6 +195,7 @@ function openAddModuleModal() {
 }
 
 function openEditModuleModal(id) {
+  if (isViewer) return;
   const m = modules.find(x => x.id === id);
   if (!m) return;
   editingModuleId = id;
@@ -128,6 +208,7 @@ function openEditModuleModal(id) {
 }
 
 async function saveModule() {
+  if (isViewer) return;
   const name = document.getElementById('m-name').value.trim();
   const desc = document.getElementById('m-desc').value.trim();
   const icon = document.getElementById('m-icon').value.trim() || '📁';
@@ -148,7 +229,7 @@ async function saveModule() {
   } else {
     const { data, error } = await supabaseClient
       .from('modules')
-      .insert({ name, icon, description: desc })
+      .insert({ name, icon, description: desc, project_id: currentProjectId })
       .select().single();
     if (error) { console.error(error); toast('Error creating module', 'danger'); return; }
     const m = { ...data, desc: data.description, groups: [] };
@@ -172,7 +253,10 @@ function selectModule(id) {
 function renderTopbar() {
   const m = getModule();
   const topbar = document.getElementById('topbarContent');
-  if (!m) { topbar.innerHTML = '<span style="color:var(--text3);font-size:13px">Select a module from the sidebar</span>'; return; }
+  if (!m) {
+    topbar.innerHTML = '<span style="color:var(--text3);font-size:13px">Select a module from the sidebar</span>';
+    return;
+  }
   const all = m.groups.reduce((a, g) => a.concat(g.cases), []);
   const pass = all.filter(c => c.status === 'Pass').length;
   const fail = all.filter(c => c.status === 'Fail').length;
@@ -212,7 +296,11 @@ function updateGroupFilter() {
 function renderMainEmpty() {
   document.getElementById('toolbar').style.display = 'none';
   document.getElementById('topbarContent').innerHTML = '<span style="color:var(--text3);font-size:13px">Select a module from the sidebar</span>';
-  document.getElementById('content').innerHTML = `<div class="no-module"><div class="no-module-icon">📋</div><div class="no-module-title">No module selected</div><div class="no-module-sub">Choose a module from the sidebar<br>or create a new one to get started</div></div>`;
+  document.getElementById('content').innerHTML = `<div class="no-module">
+    <div class="no-module-icon">📋</div>
+    <div class="no-module-title">No module selected</div>
+    <div class="no-module-sub">Choose a module from the sidebar<br>or create a new one to get started</div>
+  </div>`;
 }
 
 // ── CONTENT ──
@@ -236,16 +324,25 @@ function renderContent() {
     anyVisible = true;
 
     const isOpen = group.open !== false;
+
+    // Viewer: no right-click context on group header
+    const ctxAttr = isViewer ? '' : `oncontextmenu="showGroupCtx(event,'${group.id}')"`;
+
     html += `<div class="group" id="grp-${group.id}">
-      <div class="group-header" onclick="toggleGroup('${group.id}')">
+      <div class="group-header" onclick="toggleGroup('${group.id}')" ${ctxAttr}>
         <span class="group-chevron ${isOpen ? 'open' : ''}">▶</span>
-        <span class="group-title-text" contenteditable="true" spellcheck="false"
+        <span class="group-title-text" contenteditable="${isViewer ? 'false' : 'true'}" spellcheck="false"
           onclick="event.stopPropagation()"
-          onblur="renameGroup('${group.id}',this.innerText)">${group.title}</span>
+          onblur="${isViewer ? '' : `renameGroup('${group.id}',this.innerText)`}">${group.title}</span>
         <span class="group-count">${cases.length}</span>
         <div class="group-actions" onclick="event.stopPropagation()">
-          <button class="group-action-btn" onclick="openAddTCModal('${group.id}')" title="Add TC">+</button>
-          <button class="group-action-btn" onclick="deleteGroup('${group.id}')" title="Delete group" style="color:var(--red)">✕</button>
+          <button class="group-action-btn ${isViewer ? 'btn-disabled' : ''}"
+            onclick="${isViewer ? '' : `openAddTCModal('${group.id}')`}"
+            ${isViewer ? 'disabled title="You don\'t have permission to perform this action"' : 'title="Add TC"'}>+</button>
+          <button class="group-action-btn ${isViewer ? 'btn-disabled' : ''}"
+            onclick="${isViewer ? '' : `deleteGroup('${group.id}')`}"
+            ${isViewer ? 'disabled title="You don\'t have permission to perform this action"' : 'title="Delete group"'}
+            style="color:var(--${isViewer ? 'text3' : 'danger'})">✕</button>
         </div>
       </div>
       ${isOpen ? `<div class="group-body"><div class="table-wrap">
@@ -268,7 +365,11 @@ function renderContent() {
   });
 
   if (!anyVisible) {
-    html = `<div class="no-module"><div class="no-module-icon" style="font-size:32px">🔍</div><div class="no-module-title">No results</div><div class="no-module-sub">Try adjusting your search or filters</div></div>`;
+    html = `<div class="no-module">
+      <div class="no-module-icon" style="font-size:32px">🔍</div>
+      <div class="no-module-title">No results</div>
+      <div class="no-module-sub">Try adjusting your search or filters</div>
+    </div>`;
   }
   content.innerHTML = html;
 }
@@ -277,56 +378,70 @@ function renderRow(gid, c) {
   const stClass = { 'Not Run': 'st-notrun', 'Pass': 'st-pass', 'Fail': 'st-fail', 'Blocked': 'st-blocked' }[c.status] || 'st-notrun';
   const fmtSteps = (c.steps || '').split(/\n|\|/).filter(Boolean).map(s => `<li>${s.replace(/^\d+[\.\)]\s*/, '').trim()}</li>`).join('');
   const fmtExp = (c.expected || '').split(/\n|\|/).filter(Boolean).map(s => `<li>${s.replace(/^[-•]\s*/, '').trim()}</li>`).join('');
+
+  // Viewer: cells not editable, action buttons disabled
+  const editable = isViewer ? '' : 'contenteditable="true"';
+  const onblurId = isViewer ? '' : `onblur="updateCell('${gid}','${c.code}','id',this.innerText)"`;
+  const onblurName = isViewer ? '' : `onblur="updateCell('${gid}','${c.code}','name',this.innerText)"`;
+  const onblurDesc = isViewer ? '' : `onblur="updateCell('${gid}','${c.code}','desc',this.innerText)"`;
+  const onblurData = isViewer ? '' : `onblur="updateCell('${gid}','${c.code}','data',this.innerText)"`;
+  const onblurSteps = isViewer ? '' : `onblur="updateCell('${gid}','${c.code}','steps',this.innerText)"`;
+  const onblurExp = isViewer ? '' : `onblur="updateCell('${gid}','${c.code}','expected',this.innerText)"`;
+  const onblurActual = isViewer ? '' : `onblur="updateCell('${gid}','${c.code}','actual',this.innerText)"`;
+  const statusDisabled = isViewer ? 'disabled' : '';
+
+  const actionBtns = isViewer
+    ? `<div class="row-actions">
+        <button class="row-btn btn-disabled" disabled title="You don't have permission to perform this action">✏️</button>
+        <button class="row-btn btn-disabled" disabled title="You don't have permission to perform this action">🗑</button>
+      </div>`
+    : `<div class="row-actions">
+        <button class="row-btn" onclick="openEditTCModal('${gid}','${c.code}')" title="Edit">✏️</button>
+        <button class="row-btn danger" onclick="deleteTC('${gid}','${c.code}')" title="Delete">🗑</button>
+      </div>`;
+
   return `<tr id="row-${c.code}">
-    <td class="col-id"><span class="cell-mono editable" contenteditable="true" spellcheck="false" onblur="updateCell('${gid}','${c.code}','id',this.innerText)">${c.code}</span></td>
-    <td class="col-name"><span class="editable" contenteditable="true" spellcheck="false" style="font-weight:500" onblur="updateCell('${gid}','${c.code}','name',this.innerText)">${c.name}</span></td>
-    <td class="col-desc"><div class="editable" contenteditable="true" spellcheck="false" onblur="updateCell('${gid}','${c.code}','desc',this.innerText)" style="font-size:11.5px">${c.desc || ''}</div></td>
-    <td class="col-data"><div class="editable cell-mono" contenteditable="true" spellcheck="false" onblur="updateCell('${gid}','${c.code}','data',this.innerText)" style="font-size:11px">${(c.data || '').replace(/\|/g, '<br>')}</div></td>
-    <td class="col-steps"><div class="editable" contenteditable="true" spellcheck="false" onblur="updateCell('${gid}','${c.code}','steps',this.innerText)"><ol style="padding-left:14px;margin:0">${fmtSteps || c.steps || ''}</ol></div></td>
-    <td class="col-exp"><div class="editable" contenteditable="true" spellcheck="false" onblur="updateCell('${gid}','${c.code}','expected',this.innerText)"><ul style="padding-left:14px;margin:0">${fmtExp || c.expected || ''}</ul></div></td>
-    <td class="col-actual"><div class="editable" contenteditable="true" spellcheck="false" onblur="updateCell('${gid}','${c.code}','actual',this.innerText)" style="font-size:11.5px;min-height:28px">${c.actual || ''}</div></td>
+    <td class="col-id"><span class="cell-mono ${isViewer ? '' : 'editable'}" ${editable} spellcheck="false" ${onblurId}>${c.code}</span></td>
+    <td class="col-name"><span class="${isViewer ? '' : 'editable'}" ${editable} spellcheck="false" style="font-weight:500" ${onblurName}>${c.name}</span></td>
+    <td class="col-desc"><div class="${isViewer ? '' : 'editable'}" ${editable} spellcheck="false" ${onblurDesc} style="font-size:11.5px">${c.desc || ''}</div></td>
+    <td class="col-data"><div class="${isViewer ? '' : 'editable'} cell-mono" ${editable} spellcheck="false" ${onblurData} style="font-size:11px">${(c.data || '').replace(/\|/g, '<br>')}</div></td>
+    <td class="col-steps"><div class="${isViewer ? '' : 'editable'}" ${editable} spellcheck="false" ${onblurSteps}><ol style="padding-left:14px;margin:0">${fmtSteps || c.steps || ''}</ol></div></td>
+    <td class="col-exp"><div class="${isViewer ? '' : 'editable'}" ${editable} spellcheck="false" ${onblurExp}><ul style="padding-left:14px;margin:0">${fmtExp || c.expected || ''}</ul></div></td>
+    <td class="col-actual"><div class="${isViewer ? '' : 'editable'}" ${editable} spellcheck="false" ${onblurActual} style="font-size:11.5px;min-height:28px">${c.actual || ''}</div></td>
     <td class="col-status">
-      <select class="status-badge ${stClass}" onchange="updateStatus('${gid}','${c.code}',this.value)" onclick="event.stopPropagation()">
+      <select class="status-badge ${stClass}" onchange="updateStatus('${gid}','${c.code}',this.value)" onclick="event.stopPropagation()" ${statusDisabled}>
         <option ${c.status === 'Not Run' ? 'selected' : ''}>Not Run</option>
         <option ${c.status === 'Pass' ? 'selected' : ''}>Pass</option>
         <option ${c.status === 'Fail' ? 'selected' : ''}>Fail</option>
         <option ${c.status === 'Blocked' ? 'selected' : ''}>Blocked</option>
       </select>
     </td>
-    <td class="col-actions">
-      <div class="row-actions">
-        <button class="row-btn" onclick="openEditTCModal('${gid}','${c.code}')" title="Edit">✏️</button>
-        <button class="row-btn danger" onclick="deleteTC('${gid}','${c.code}')" title="Delete">🗑</button>
-      </div>
-    </td>
+    <td class="col-actions">${actionBtns}</td>
   </tr>`;
 }
 
 // ── INLINE EDIT ──
 async function updateCell(gid, cid, field, val) {
+  if (isViewer) return;
   const m = getModule(); if (!m) return;
   const g = m.groups.find(g => g.id === gid); if (!g) return;
   const c = g.cases.find(c => c.code === cid); if (!c) return;
 
   const trimmed = val.trim();
   c[field] = trimmed;
-
   const dbField = field === 'desc' ? 'description' : field === 'id' ? 'code' : field;
 
   const { error } = await supabaseClient
     .from('test_cases')
     .update({ [dbField]: trimmed })
     .eq('id', c.dbId);
-
   if (error) console.error(error);
 
-  if (field === 'id') {
-    c.code = trimmed;
-    renderContent();
-  }
+  if (field === 'id') { c.code = trimmed; renderContent(); }
 }
 
 async function updateStatus(gid, cid, val) {
+  if (isViewer) return;
   const m = getModule(); if (!m) return;
   const g = m.groups.find(g => g.id === gid); if (!g) return;
   const c = g.cases.find(c => c.code === cid); if (!c) return;
@@ -351,6 +466,7 @@ async function toggleGroup(gid) {
 }
 
 async function renameGroup(gid, val) {
+  if (isViewer) return;
   const m = getModule(); if (!m) return;
   const g = m.groups.find(g => g.id === gid); if (!g) return;
   const title = val.trim() || g.title;
@@ -359,7 +475,20 @@ async function renameGroup(gid, val) {
   updateGroupFilter();
 }
 
+// Group context menu (right click on header)
+function showGroupCtx(e, gid) {
+  if (isViewer) return;
+  e.preventDefault();
+  e.stopPropagation();
+  showCtx(e.clientX, e.clientY, [
+    { label: '➕  Add Test Case', action: `openAddTCModal('${gid}')` },
+    { sep: true },
+    { label: '🗑️  Delete Group', action: `deleteGroup('${gid}')`, danger: true }
+  ]);
+}
+
 function openAddGroupModal() {
+  if (isViewer) return;
   const m = getModule(); if (!m) return;
   document.getElementById('addGroupModalTitle').textContent = 'Add Group';
   document.getElementById('group-name').value = `Group ${m.groups.length + 1} — New Feature`;
@@ -368,6 +497,7 @@ function openAddGroupModal() {
 }
 
 async function saveGroup() {
+  if (isViewer) return;
   const m = getModule(); if (!m) return;
   const title = document.getElementById('group-name').value.trim();
   if (!title) { alert('Group name is required'); return; }
@@ -386,6 +516,7 @@ async function saveGroup() {
 }
 
 async function deleteGroup(gid) {
+  if (isViewer) return;
   const m = getModule(); if (!m) return;
   const g = m.groups.find(g => g.id === gid);
   openConfirmModal('Delete Group', `Delete group "${g.title}" and all its test cases?`, async () => {
@@ -399,6 +530,7 @@ async function deleteGroup(gid) {
 
 // ── ADD/EDIT TC ──
 function openAddTCModal(gid = null) {
+  if (isViewer) return;
   const m = getModule(); if (!m) return;
   editingTC = null;
   document.getElementById('tcModalTitle').textContent = 'Add Test Case';
@@ -406,11 +538,13 @@ function openAddTCModal(gid = null) {
   ['tc-id', 'tc-name', 'tc-desc', 'tc-data', 'tc-steps', 'tc-expected', 'tc-actual'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('tc-status').value = 'Not Run';
   const grpSel = document.getElementById('tc-group');
-  grpSel.innerHTML = '<option value="">Select Group</option>' + m.groups.map(g => `<option value="${g.id}" ${g.id === gid ? 'selected' : ''}>${g.title}</option>`).join('');
+  grpSel.innerHTML = '<option value="">Select Group</option>' +
+    m.groups.map(g => `<option value="${g.id}" ${g.id === gid ? 'selected' : ''}>${g.title}</option>`).join('');
   openModal('tcModal');
 }
 
 function openEditTCModal(gid, cid) {
+  if (isViewer) return;
   const m = getModule(); if (!m) return;
   const g = m.groups.find(g => g.id === gid); if (!g) return;
   const c = g.cases.find(c => c.code === cid); if (!c) return;
@@ -432,6 +566,7 @@ function openEditTCModal(gid, cid) {
 }
 
 async function saveTC() {
+  if (isViewer) return;
   const id = document.getElementById('tc-id').value.trim();
   const name = document.getElementById('tc-name').value.trim();
   const gid = document.getElementById('tc-group').value;
@@ -452,18 +587,16 @@ async function saveTC() {
   };
 
   if (editingTC) {
-    const c = g.cases.find(cc => cc.code === editingTC.cid); 
+    const c = g.cases.find(cc => cc.code === editingTC.cid);
     if (!c) return;
-
     const { error } = await supabaseClient
       .from('test_cases')
       .update({ ...tc, group_id: gid })
       .eq('id', c.dbId);
     if (error) { console.error(error); toast('Error updating test case', 'danger'); return; }
-
     const og = m.groups.find(g => g.id === editingTC.gid);
     if (og) og.cases = og.cases.filter(c => c.code !== editingTC.cid);
-    const tcLocal = { ...tc, desc: tc.description, dbId: editingTC.dbId };
+    const tcLocal = { ...tc, desc: tc.description, dbId: c.dbId };
     if (gid === editingTC.gid) {
       g.cases.splice(editingTC.index, 0, tcLocal);
     } else {
@@ -473,7 +606,6 @@ async function saveTC() {
   } else {
     const dup = g.cases.some(c => c.code === id);
     if (dup) { alert('Test Case ID already exists'); return; }
-
     const { data, error } = await supabaseClient
       .from('test_cases').insert(tc).select().single();
     if (error) { console.error(error); toast('Error creating test case', 'danger'); return; }
@@ -486,18 +618,14 @@ async function saveTC() {
 }
 
 async function deleteTC(gid, cid) {
+  if (isViewer) return;
   const m = getModule(); if (!m) return;
   const g = m.groups.find(g => g.id === gid); if (!g) return;
   const c = g.cases.find(c => c.code === cid); if (!c) return;
 
   openConfirmModal('Delete Test Case', 'Delete this test case?', async () => {
-    const { error } = await supabaseClient
-      .from('test_cases')
-      .delete()
-      .eq('id', c.dbId);
-
+    const { error } = await supabaseClient.from('test_cases').delete().eq('id', c.dbId);
     if (error) { console.error(error); toast('Error deleting test case', 'danger'); return; }
-
     g.cases = g.cases.filter(tc => tc.code !== cid);
     renderContent(); renderTopbar(); renderSidebar();
     toast('Test case deleted');
@@ -524,7 +652,8 @@ function exportHTML() {
       </tr>`;
     });
   });
-  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${m.name} — Test Cases</title></head><body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;padding:24px;background:#f5f6f8;color:#1a1a2e">
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${m.name} — Test Cases</title></head>
+  <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;padding:24px;background:#f5f6f8;color:#1a1a2e">
     <h1 style="color:#185FA5;font-size:20px;margin-bottom:4px">${m.icon || ''} ${m.name}</h1>
     <p style="color:#666;font-size:12px;margin-bottom:20px">${m.desc || ''}</p>
     <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;min-width:900px;background:#fff;border-radius:8px;overflow:hidden">
@@ -552,6 +681,7 @@ function exportHTML() {
 // ── MODAL HELPERS ──
 function openModal(id) { document.getElementById(id).classList.add('open'); }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
 document.addEventListener('click', e => {
   ['addModuleModal', 'tcModal'].forEach(id => {
     const el = document.getElementById(id);
@@ -609,18 +739,6 @@ function toast(msg, type = 'success') {
   }, 2200);
 }
 
-// ── BOOT ──
-async function init() {
-  await loadFromDB();
-  renderSidebar();
-  if (modules.length) {
-    selectModule(modules[0].id);
-  } else {
-    renderMainEmpty();
-  }
-}
-init();
-
 // ── IMPORT CSV ──
 function parseCSV(text) {
   const lines = text.trim().split('\n').map(line => line.split(',').map(cell => cell.replace(/"/g, '').trim()));
@@ -652,6 +770,7 @@ function parseCSV(text) {
 }
 
 async function handleImport() {
+  if (isViewer) return;
   const fileInput = document.getElementById('fileInput');
   const file = fileInput.files[0];
   if (!file) return toast('Please select a CSV file', 'danger');
@@ -664,7 +783,6 @@ async function handleImport() {
     const m = getModule();
     if (!m) return toast('Select a module first', 'danger');
 
-    // Group các TC theo group name
     const groupMap = {};
     data.forEach(tc => {
       const key = tc.gid.toLowerCase();
@@ -674,8 +792,6 @@ async function handleImport() {
 
     for (const key of Object.keys(groupMap)) {
       const { name, tcs } = groupMap[key];
-
-      // Tìm group có sẵn hoặc tạo mới
       let g = m.groups.find(gr => gr.title.toLowerCase() === key);
       if (!g) {
         const { data: newGroup, error } = await supabaseClient
@@ -687,41 +803,28 @@ async function handleImport() {
         m.groups.push(g);
       }
 
-      // Bulk insert tất cả TC của group này
       const tcInserts = tcs.map((tc, i) => ({
-        code: tc.id,
-        group_id: g.id,
-        name: tc.name,
-        description: tc.desc,
-        data: tc.data,
-        steps: tc.steps,
-        expected: tc.expected,
-        actual: tc.actual || '',
-        status: tc.status || 'Not Run',
-        position: g.cases.length + i
+        code: tc.id, group_id: g.id, name: tc.name,
+        description: tc.desc, data: tc.data, steps: tc.steps,
+        expected: tc.expected, actual: tc.actual || '',
+        status: tc.status || 'Not Run', position: g.cases.length + i
       }));
 
       const { data: inserted, error: tcError } = await supabaseClient
         .from('test_cases').insert(tcInserts).select();
       if (tcError) { console.error(tcError); continue; }
 
-      inserted.forEach(tc => g.cases.push({ 
-       ...tc, 
-       dbId: tc.id,      
-       code: tc.code,     
-       desc: tc.description 
+      inserted.forEach(tc => g.cases.push({
+        ...tc, dbId: tc.id, code: tc.code, desc: tc.description
       }));
-      }
+    }
 
-    renderContent();
-    renderSidebar();
-    updateGroupFilter();
+    renderContent(); renderSidebar(); updateGroupFilter();
     toast(`Imported ${data.length} test cases`);
   } catch (error) {
     console.error(error);
     toast('Error importing CSV', 'danger');
   }
-
   fileInput.value = '';
 }
 
@@ -732,6 +835,7 @@ document.getElementById('m-name').addEventListener('keydown', e => { if (e.key =
 let aiGrouped = {};
 
 function openAIModal() {
+  if (isViewer) return;
   const m = getModule();
   if (!m) return toast('Select a module first', 'danger');
   document.getElementById('ai-requirement').value = '';
@@ -741,40 +845,29 @@ function openAIModal() {
   document.getElementById('aiModal').classList.add('open');
 }
 
-function closeAIModal() {
-  document.getElementById('aiModal').classList.remove('open');
-}
-
+function closeAIModal() { document.getElementById('aiModal').classList.remove('open'); }
 function backToStep1() {
   document.getElementById('aiStep1').style.display = 'flex';
   document.getElementById('aiStep2').style.display = 'none';
 }
 
 function selectAllTC(checked) {
-  document.querySelectorAll('.ai-tc-check, .ai-group-check')
-    .forEach(cb => cb.checked = checked);
+  document.querySelectorAll('.ai-tc-check, .ai-group-check').forEach(cb => cb.checked = checked);
 }
 
 async function handleGenerate() {
+  if (isViewer) return;
   const fileInput = document.getElementById('ai-requirement');
   const file = fileInput.files[0];
-
-  // validate
   if (!file) return toast('Please upload a PDF file', 'danger');
-  if (file.type !== 'application/pdf') {
-    return toast('Only PDF file is allowed', 'danger');
-  }
+  if (file.type !== 'application/pdf') return toast('Only PDF file is allowed', 'danger');
 
-  // Show loading
   document.getElementById('aiStep1').style.display = 'none';
   document.getElementById('aiLoading').style.display = 'flex';
 
   try {
     const requirement = await readPDF(file);
-
-    if (!requirement.trim()) {
-      throw new Error('Cannot read content from PDF');
-    }
+    if (!requirement.trim()) throw new Error('Cannot read content from PDF');
     const testCases = await generateTestCases(requirement);
     const { html, grouped } = renderPreview(testCases);
     aiGrouped = grouped;
@@ -785,10 +878,7 @@ async function handleGenerate() {
 
     document.getElementById('aiLoading').style.display = 'none';
     document.getElementById('aiStep2').style.display = 'flex';
-
-    // reset file
     fileInput.value = '';
-
   } catch (err) {
     console.error(err);
     toast('Failed to generate: ' + err.message, 'danger');
@@ -797,39 +887,31 @@ async function handleGenerate() {
   }
 }
 
-const input = document.getElementById('ai-requirement');
+const aiFileInput = document.getElementById('ai-requirement');
 const fileName = document.getElementById('fileName');
-
-if (input) {
-  input.addEventListener('change', () => {
-    if (input.files.length > 0) {
-      fileName.textContent = input.files[0].name;
-    } else {
-      fileName.textContent = 'Chưa chọn file';
-    }
+if (aiFileInput) {
+  aiFileInput.addEventListener('change', () => {
+    fileName.textContent = aiFileInput.files.length > 0 ? aiFileInput.files[0].name : 'File not selected';
   });
 }
 
 pdfjsLib.GlobalWorkerOptions.workerSrc =
-  "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
 async function readPDF(file) {
   const arrayBuffer = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-
   let text = '';
-
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i);
     const content = await page.getTextContent();
-
-    const strings = content.items.map(item => item.str);
-    text += strings.join(' ') + '\n';
+    text += content.items.map(item => item.str).join(' ') + '\n';
   }
-
   return text;
 }
 
 async function handleAIImport() {
+  if (isViewer) return;
   const selected = getSelectedTestCases(aiGrouped);
   if (!selected.length) return toast('Please select at least one test case', 'danger');
 
@@ -840,7 +922,6 @@ async function handleAIImport() {
   document.getElementById('aiImportBtn').disabled = true;
 
   try {
-    // Group by group name
     const groupMap = {};
     selected.forEach(tc => {
       if (!groupMap[tc.group]) groupMap[tc.group] = [];
@@ -848,7 +929,6 @@ async function handleAIImport() {
     });
 
     for (const [groupName, tcs] of Object.entries(groupMap)) {
-      // Find or create group
       let g = m.groups.find(gr => gr.title.toLowerCase() === groupName.toLowerCase());
       if (!g) {
         const { data: newGroup, error } = await supabaseClient
@@ -860,17 +940,10 @@ async function handleAIImport() {
         m.groups.push(g);
       }
 
-      // Bulk insert TCs
       const tcInserts = tcs.map((tc, i) => ({
-        code: tc.id,
-        group_id: g.id,
-        name: tc.name,
-        description: tc.desc,
-        data: tc.data || '',
-        steps: tc.steps || '',
-        expected: tc.expected || '',
-        actual: '',
-        status: 'Not Run',
+        code: tc.id, group_id: g.id, name: tc.name,
+        description: tc.desc, data: tc.data || '', steps: tc.steps || '',
+        expected: tc.expected || '', actual: '', status: 'Not Run',
         position: g.cases.length + i
       }));
 
@@ -881,9 +954,7 @@ async function handleAIImport() {
     }
 
     closeAIModal();
-    renderContent();
-    renderSidebar();
-    updateGroupFilter();
+    renderContent(); renderSidebar(); updateGroupFilter();
     toast(`Imported ${selected.length} test cases successfully! 🎉`);
   } catch (err) {
     console.error(err);
@@ -892,4 +963,48 @@ async function handleAIImport() {
 
   document.getElementById('aiImportBtn').textContent = 'Import Selected';
   document.getElementById('aiImportBtn').disabled = false;
+}
+
+// ── BOOT ──
+async function init() {
+  currentProjectId = getProjectIdFromURL();
+
+  // Nếu không có project_id → redirect về projects
+  if (!currentProjectId) {
+    window.location.href = 'projects.html';
+    return;
+  }
+
+  await checkProjectRole();
+  applyViewerRestrictions();
+  await loadProjectName();
+  await loadFromDB();
+  renderSidebar();
+
+  if (modules.length) {
+    selectModule(modules[0].id);
+  } else {
+    renderMainEmpty();
+  }
+}
+
+init();
+
+// ── LOAD PROJECT NAME ──
+async function loadProjectName() {
+  const { data, error } = await supabaseClient
+    .from('projects')
+    .select('name')
+    .eq('id', currentProjectId)
+    .single();
+  if (error || !data) return;
+  currentProjectName = data.name;
+  const btn = document.getElementById('backBtn');
+  if (btn) {
+    btn.innerHTML = `
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+        <polyline points="15,18 9,12 15,6"/>
+      </svg>
+      <span>${data.name}</span>`;
+  }
 }

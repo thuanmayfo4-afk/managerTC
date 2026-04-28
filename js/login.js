@@ -19,7 +19,7 @@ document.addEventListener("DOMContentLoaded", () => {
       console.error('Login error:', error);
       alert(`Login failed: ${error.message} (Status: ${error.status || 'unknown'})`);
     } else {
-      window.location.href = "index.html";
+      window.location.href = "projects.html";
     }
   });
 });

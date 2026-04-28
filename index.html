@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Caio - QC</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐶</text></svg>">
-
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css">
 </head>
@@ -24,8 +23,12 @@
     </div>
     <div class="sidebar-section">Modules</div>
     <div class="module-list" id="moduleList"></div>
-    <button class="btn-add-module" onclick="openAddModuleModal()">
-      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><line x1="6" y1="1" x2="6" y2="11"/><line x1="1" y1="6" x2="11" y2="6"/></svg>
+
+    <!-- Add Module: disabled for viewer via JS -->
+    <button class="btn-add-module" id="btnAddModule" onclick="openAddModuleModal()">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="6" y1="1" x2="6" y2="11"/><line x1="1" y1="6" x2="11" y2="6"/>
+      </svg>
       <span>Add Module</span>
     </button>
   </aside>
@@ -33,10 +36,27 @@
   <!-- MAIN -->
   <div class="main">
     <div class="topbar" id="topbar">
+      <!-- Back to Projects -->
+      <button class="back-btn" id="backBtn" onclick="goBackToProjects()" title="Back to Projects">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <polyline points="15,18 9,12 15,6"/>
+        </svg>
+        <span>Projects</span>
+      </button>
+
       <div id="topbarContent">
         <span style="color:var(--text3);font-size:13px">Select a module from the sidebar</span>
       </div>
+
       <div class="topbar-right">
+        <!-- Viewer badge: shown only for viewers -->
+        <div class="viewer-badge" id="viewerBadge" style="display:none">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+          View Only
+        </div>
         <button class="logout-btn" onclick="logout()" title="Logout">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
@@ -49,7 +69,9 @@
 
     <div class="toolbar" id="toolbar" style="display:none">
       <div class="search-wrap">
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="7" cy="7" r="5"/><line x1="11" y1="11" x2="14" y2="14"/></svg>
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="7" cy="7" r="5"/><line x1="11" y1="11" x2="14" y2="14"/>
+        </svg>
         <input class="search-input" id="searchInput" placeholder="Search test cases..." oninput="renderContent()">
       </div>
       <select class="filter-select" id="statusFilter" onchange="renderContent()">
@@ -64,11 +86,12 @@
       </select>
 
       <div class="toolbar-right">
-        <button class="btn-sm" onclick="openAddGroupModal()">Add Group</button>
-        <button class="btn-sm primary" onclick="openAddTCModal()">Add Test Case</button>
-        <button class="btn-sm" onclick="openAIModal()" style="background:var(--accent);border-color:var(--accent);color:#fff">✨ Generate</button>
+        <!-- These buttons are disabled for viewer -->
+        <button class="btn-sm" id="btnAddGroup" onclick="openAddGroupModal()">Add Group</button>
+        <button class="btn-sm primary" id="btnAddTC" onclick="openAddTCModal()">Add Test Case</button>
+        <button class="btn-sm" id="btnGenerate" onclick="openAIModal()" style="background:var(--accent);border-color:var(--accent);color:#fff">✨ Generate</button>
         <button class="btn-sm" onclick="exportHTML()">Export</button>
-        <button class="btn-sm" onclick="document.getElementById('fileInput').click()">Import CSV</button>
+        <button class="btn-sm" id="btnImport" onclick="document.getElementById('fileInput').click()">Import CSV</button>
         <input type="file" id="fileInput" accept=".csv" style="display:none" onchange="handleImport()" />
       </div>
     </div>
@@ -104,6 +127,7 @@
     </div>
   </div>
 </div>
+
 <div class="modal-overlay" id="addGroupModal">
   <div class="modal" style="width:420px">
     <div class="modal-header">
@@ -122,6 +146,7 @@
     </div>
   </div>
 </div>
+
 <div class="modal-overlay" id="confirmModal">
   <div class="modal" style="width:420px">
     <div class="modal-header">
@@ -137,6 +162,7 @@
     </div>
   </div>
 </div>
+
 <div class="modal-overlay" id="tcModal">
   <div class="modal" style="width:640px">
     <div class="modal-header">
@@ -199,51 +225,30 @@
 <div class="modal-overlay" id="aiModal">
   <div class="modal" style="width:680px;max-height:90vh;display:flex;flex-direction:column">
     <div class="modal-header">
-      <div class="modal-title" id="aiModalTitle">✨ Generate Test Cases with AI</div>
+      <div class="modal-title">✨ Generate Test Cases with AI</div>
       <button class="modal-close" onclick="closeAIModal()">×</button>
     </div>
 
-    <!-- Step 1: Input -->
+    <!-- Step 1 -->
     <div id="aiStep1" style="display:flex;flex-direction:column;flex:1;overflow:hidden">
-  <div class="modal-body" style="flex:1">
-    <div class="form-group">
-      <label class="form-label">Upload Requirement (PDF only)</label>
-
-      <!-- ✅ FILE INPUT -->
-      <div class="form-group">
-  <label class="form-label">Upload Requirement (PDF)</label>
-
-  <div class="file-upload">
-    <label for="ai-requirement" class="file-label">
-      📄 Select PDF file
-    </label>
-
-    <input 
-      type="file" 
-      id="ai-requirement" 
-      accept="application/pdf"
-    />
-
-    <span id="fileName">File not selected</span>
-  </div>
-</div>
-
-      <!-- ✅ SHOW FILE NAME -->
-      <div id="ai-file-name" style="font-size:12px;color:var(--text3);margin-top:6px"></div>
+      <div class="modal-body" style="flex:1">
+        <div class="form-group">
+          <label class="form-label">Upload Requirement (PDF)</label>
+          <div class="file-upload">
+            <label for="ai-requirement" class="file-label">📄 Select PDF file</label>
+            <input type="file" id="ai-requirement" accept="application/pdf"/>
+            <span id="fileName">File not selected</span>
+          </div>
+        </div>
+        <div style="font-size:11.5px;color:var(--text3);margin-top:4px">
+          📄 Upload a PDF file containing your requirement. AI will generate test cases automatically.
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-cancel" onclick="closeAIModal()">Cancel</button>
+        <button class="btn-save" id="aiGenerateBtn" onclick="handleGenerate()">✨ Generate</button>
+      </div>
     </div>
-
-    <div style="font-size:11.5px;color:var(--text3);margin-top:4px">
-      📄 Upload a PDF file containing your requirement. AI will generate test cases automatically.
-    </div>
-  </div>
-
-  <div class="modal-footer">
-    <button class="btn-cancel" onclick="closeAIModal()">Cancel</button>
-    <button class="btn-save" id="aiGenerateBtn" onclick="handleGenerate()">
-      ✨ Generate
-    </button>
-  </div>
-</div>
 
     <!-- Step 2: Preview -->
     <div id="aiStep2" style="display:none;flex-direction:column;flex:1;overflow:hidden">
@@ -257,9 +262,7 @@
       <div id="aiPreviewList" style="flex:1;overflow-y:auto;padding:16px 20px"></div>
       <div class="modal-footer">
         <button class="btn-cancel" onclick="backToStep1()">← Back</button>
-        <button class="btn-save" id="aiImportBtn" onclick="handleAIImport()">
-          Import Selected
-        </button>
+        <button class="btn-save" id="aiImportBtn" onclick="handleAIImport()">Import Selected</button>
       </div>
     </div>
 
